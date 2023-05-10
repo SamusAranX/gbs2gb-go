@@ -18,13 +18,6 @@
 .idea/**/gradle.xml
 .idea/**/libraries
 
-# binaries
-/gbs2gb
-/gbs2gb.exe
-
-# json files
-/*.json
-
 ### Windows template
 # Windows thumbnail cache files
 Thumbs.db
@@ -72,5 +65,9 @@ Icon
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
 
-# secrets
-.env
+# project files
+/gbs2gb
+/gbs2gb.exe
+/out
+*.gb
+*.gbs
