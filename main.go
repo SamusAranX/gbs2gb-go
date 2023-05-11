@@ -25,7 +25,7 @@ func main() {
 			log.Fatalln(err)
 		}
 	}
-	
+
 	if opts.Version {
 		fmt.Printf("gbs2gb %s\n", constants.GitVersion)
 		return
