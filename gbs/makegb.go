@@ -53,22 +53,20 @@ func calculateROMTypeAndSize(fileLength int) (cartType, romSize, romSizeBytes in
 func insertPlayerAndGBS(header Header, cartType, romSize int, gbBytes, gbsBytes []byte) {
 	gbsPlayer := GBSPlayROM()
 
-	// patch header
-	log.Printf("title bytes copied: %d", copy(gbsPlayer[0x134:0x143], header.TitleBytes[:15]))
-	log.Printf("mbc/size bytes copied: %d", copy(gbsPlayer[0x147:0x149], []byte{byte(cartType), byte(romSize)}))
+	// patch header by inserting ROM title, cartridge type, and ROM size
+	copy(gbsPlayer[0x134:0x143], header.TitleBytes[:15])
+	copy(gbsPlayer[0x147:0x149], []byte{byte(cartType), byte(romSize)})
 
 	// regenerate header checksum
 	headerChecksum := headerChecksum(gbsPlayer[0x134:0x14d])
-	log.Printf("checksum bytes copied: %d", copy(gbsPlayer[0x14d:0x14e], []byte{headerChecksum}))
+	copy(gbsPlayer[0x14d:0x14e], []byte{headerChecksum})
 
 	// insert gbs player into gb rom
-	gbsPlayerBytesCopied := copy(gbBytes[:0x400], gbsPlayer[:])
-	log.Printf("gbs player inserted: %d", gbsPlayerBytesCopied)
+	copy(gbBytes[:0x400], gbsPlayer[:])
 
 	// insert gbs file
 	gbsStart := int(header.LoadAddr - headerLength)
-	gbsBytesCopied := copy(gbBytes[gbsStart:gbsStart+len(gbsBytes)], gbsBytes)
-	log.Printf("gbs file inserted: %d", gbsBytesCopied)
+	copy(gbBytes[gbsStart:gbsStart+len(gbsBytes)], gbsBytes)
 }
 
 func fillRSTTable(gbsStart int, staticData []byte) {
@@ -79,9 +77,7 @@ func fillRSTTable(gbsStart int, staticData []byte) {
 
 		rst := make([]byte, 2)
 		binary.LittleEndian.PutUint16(rst, uint16(rstAddr&0xFFFF))
-		_ = copy(staticData[rstInst:rstInst+2], rst)
-
-		//log.Printf("rst 0x%02X: 0x%04X [%d]", rstInst, rstAddr, rstBytesCopied)
+		copy(staticData[rstInst:rstInst+2], rst)
 	}
 }
 
@@ -93,9 +89,7 @@ func fillTextTable(gbsStart int, staticData []byte) {
 
 		text := make([]byte, 2)
 		binary.LittleEndian.PutUint16(text, uint16(textOffset&0xFFFF))
-		_ = copy(staticData[textEntry:textEntry+2], text)
-
-		//log.Printf("text 0x%02X: 0x%04X [%d]", textEntry, textOffset, textBytesCopied)
+		copy(staticData[textEntry:textEntry+2], text)
 	}
 }
 
@@ -116,9 +110,7 @@ func doOtherStuff(gbsStart int, otherStuff []byte) {
 
 		stuff := make([]byte, 2)
 		binary.LittleEndian.PutUint16(stuff, uint16(ptr&0xFFFF))
-		_ = copy(otherStuff[offset:offset+2], stuff)
-
-		//log.Printf("stuff 0x%02X: 0x%04X [%d]", offset, ptr, stuffBytesCopied)
+		copy(otherStuff[offset:offset+2], stuff)
 	}
 }
 
@@ -136,9 +128,7 @@ func doShiftedData(gbsStart int, shiftedData []byte) {
 
 		shift := make([]byte, 2)
 		binary.LittleEndian.PutUint16(shift, uint16(ptr&0xFFFF))
-		_ = copy(shiftedData[offset:offset+2], shift)
-
-		//log.Printf("shift 0x%02X: 0x%04X [%d]", offset, ptr, shiftBytesCopied)
+		copy(shiftedData[offset:offset+2], shift)
 	}
 }
 
@@ -147,9 +137,8 @@ func playerCheckSubroutine(gbsStart int, gbBytes []byte) {
 	pcs2 := make([]byte, 2)
 	binary.LittleEndian.PutUint16(pcs1, uint16(gbsStart+headerLength+0x40))
 	binary.LittleEndian.PutUint16(pcs2, uint16(gbsStart+headerLength+0x48))
-	_ = copy(gbBytes[0x41:0x43], pcs1)
-	_ = copy(gbBytes[0x51:0x53], pcs2)
-	//log.Printf("pcs copied: %d, %d", pcs1BytesCopied, pcs2BytesCopied)
+	copy(gbBytes[0x41:0x43], pcs1)
+	copy(gbBytes[0x51:0x53], pcs2)
 }
 
 func rewriteInterruptInfo(gbsStart int, gbBytes []byte) {
@@ -166,23 +155,23 @@ func apply150400Recoding(gbBytes []byte, binaryOffset int) {
 	// (FE11 'CC????' 11???? 210082)
 	pe := make([]byte, 2)
 	binary.LittleEndian.PutUint16(pe, uint16(playerEntrypoint+0x66))
-	log.Printf("pe copied: %d", copy(gbBytes[0x9D+binaryOffset:0x9F+binaryOffset], pe))
+	copy(gbBytes[0x9D+binaryOffset:0x9F+binaryOffset], pe)
 
 	// (FE11 CC???? '11????' 210082):
 	binary.LittleEndian.PutUint16(pe, uint16(playerEntrypoint+0x10B+1))
-	log.Printf("pe copied: %d", copy(gbBytes[0xA0+binaryOffset:0xA2+binaryOffset], pe))
+	copy(gbBytes[0xA0+binaryOffset:0xA2+binaryOffset], pe)
 
 	// 0x101 jump to the 0x150-0x400 code
 	binary.LittleEndian.PutUint16(pe, uint16(playerEntrypoint))
-	log.Printf("pe copied: %d", copy(gbBytes[0x102:0x104], pe))
+	copy(gbBytes[0x102:0x104], pe)
 
 	binary.LittleEndian.PutUint16(pe, uint16(playerEntrypoint+0x9E+1))
-	log.Printf("pe copied: %d", copy(gbBytes[playerEntrypoint+0x95:playerEntrypoint+0x97], pe))
+	copy(gbBytes[playerEntrypoint+0x95:playerEntrypoint+0x97], pe)
 	binary.LittleEndian.PutUint16(pe, uint16(playerEntrypoint+0x92))
-	log.Printf("pe copied: %d", copy(gbBytes[playerEntrypoint+0x100:playerEntrypoint+0x102], pe))
+	copy(gbBytes[playerEntrypoint+0x100:playerEntrypoint+0x102], pe)
 }
 
-func MakeGB(gbsBytes []byte, outFile string, debug bool) error {
+func MakeGB(gbsBytes []byte, outFile string) error {
 	header, err := validateHeader(gbsBytes[:headerLength])
 	if err != nil {
 		return err
@@ -196,8 +185,6 @@ func MakeGB(gbsBytes []byte, outFile string, debug bool) error {
 
 	fileLength := len(gbsBytes) + int(header.LoadAddr) - headerLength
 	cartType, romSize, romSizeBytes, err := calculateROMTypeAndSize(fileLength)
-	log.Printf("CartridgeType/ROMSize: %d/%d", cartType, romSize)
-	log.Printf("ROM Size in bytes: %d", romSizeBytes)
 
 	gbBytes := make([]byte, romSizeBytes)
 	for i := range gbBytes {
@@ -207,10 +194,10 @@ func MakeGB(gbsBytes []byte, outFile string, debug bool) error {
 
 	insertPlayerAndGBS(header, cartType, romSize, gbBytes, gbsBytes)
 
-	// refer to GBS2GB.txt for the following:
-
 	gbsStart := int(header.LoadAddr - headerLength)
 	staticData := gbBytes[:0x3B]
+
+	// refer to GBS2GB.txt for the following:
 
 	// RST Table
 	fillRSTTable(gbsStart, staticData)
@@ -223,11 +210,7 @@ func MakeGB(gbsBytes []byte, outFile string, debug bool) error {
 	doOtherStuff(gbsStart, otherStuff)
 
 	// EI, Halt
-	_ = copy(gbBytes[playerEntrypoint+0x92:playerEntrypoint+0x94], []byte{0xFB, 0x76})
-	//log.Printf("ei, halt copied: %d", eiHaltBytesCopied)
-
-	//log.Printf("gbsStart: 0x%04X", gbsStart)
-	//log.Printf("pe: 0x%04X:0x%04X", playerEntrypoint, playerEntrypoint+0x106)
+	copy(gbBytes[playerEntrypoint+0x92:playerEntrypoint+0x94], []byte{0xFB, 0x76})
 
 	// shifted data (see gbsplay.asm for the GBS player specifics)
 	shiftedData := gbBytes[playerEntrypoint : playerEntrypoint+0x106]
@@ -249,7 +232,7 @@ func MakeGB(gbsBytes []byte, outFile string, debug bool) error {
 	// recompute global checksum (no game boy checks this but hey why not)
 	gcs := make([]byte, 2)
 	binary.BigEndian.PutUint16(gcs, globalChecksum(gbBytes))
-	log.Printf("global checksum copied: %d", copy(gbBytes[0x14E:0x150], gcs))
+	copy(gbBytes[0x14E:0x150], gcs)
 
 	written, err := utils.WriteAllBytes(outFile, gbBytes)
 	if err != nil {
