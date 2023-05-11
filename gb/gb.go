@@ -21,18 +21,19 @@ var (
 	}
 )
 
-func GetROMSize(fileSize int) (romSize int, usesMBC bool) {
+func GetROMSize(fileSize int) (romSize int, trueSize int, usesMBC bool) {
 	for i := 0; i < 9; i++ {
 		if fileSize <= (0x8000 << i) {
-			romSize = romSizes[i]
-			return romSize, usesMBC
+			romSize = i
+			trueSize = romSizes[i]
+			return romSize, trueSize, usesMBC
 		}
 
-		// only set to 1 if a second loop happens
+		// only set to true if a second loop happens
 		usesMBC = true
 	}
 
-	return -1, false
+	return -1, -1, false
 }
 
 // GBSHeader describes the header of a GBS file.
