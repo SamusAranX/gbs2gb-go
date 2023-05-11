@@ -1,7 +1,6 @@
 package constants
 
 import (
-	"fmt"
 	"log"
 	"time"
 )
@@ -13,8 +12,6 @@ var (
 	GitVersion     = "n/a"
 	GitTag         = "v0.0.0" // provide default value that can be parsed
 	BuildTime      = "n/a"
-
-	UserAgent = fmt.Sprintf("islive/%s", GitTag)
 )
 
 const (

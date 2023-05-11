@@ -9,7 +9,7 @@ import (
 func ReadAllBytes(name string) ([]byte, error) {
 	file, err := os.Open(name)
 	if err != nil {
-		log.Printf("ERROR: Can't open file %s", name)
+		log.Printf("Can't open file %s", name)
 		return nil, err
 	}
 
@@ -17,7 +17,7 @@ func ReadAllBytes(name string) ([]byte, error) {
 
 	fileBytes, err := io.ReadAll(file)
 	if err != nil {
-		log.Printf("ERROR: Can't read file %s", name)
+		log.Printf("Can't read file %s", name)
 		return nil, err
 	}
 

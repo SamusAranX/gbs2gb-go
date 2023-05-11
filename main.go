@@ -35,12 +35,16 @@ func main() {
 		log.Fatalf("Can't create output directory: %v", err)
 	}
 
-	for _, inputFile := range opts.InputFiles {
+	for i, inputFile := range opts.InputFiles {
+		if i > 0 {
+			log.Println("################")
+		}
+
 		_, inputBase := path.Split(inputFile)
 		inputNoext := strings.TrimSuffix(inputBase, path.Ext(inputBase))
 		outputFile := path.Join(opts.OutDir, fmt.Sprintf("%s.gb", inputNoext))
 
-		log.Printf("%s → %s", inputBase, fmt.Sprintf("%s.gb", inputNoext))
+		log.Println(inputBase)
 
 		gbsBytes, err := utils.ReadAllBytes(inputFile)
 		if err != nil {
@@ -48,9 +52,9 @@ func main() {
 			continue
 		}
 
-		err = gbs.MakeGB(gbsBytes, outputFile, opts.Debug)
+		err = gbs.MakeGB(gbsBytes, outputFile)
 		if err != nil {
-			log.Printf("ERROR: Couldn't create GB file.")
+			log.Printf("Couldn't create GB file:")
 			log.Println(err)
 		}
 	}
