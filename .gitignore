@@ -66,8 +66,8 @@ Icon
 .com.apple.timemachine.donotpresent
 
 # project files
-/gbs2gb
-/gbs2gb.exe
+/gbs2gb*
+/gbs2gb*.exe
 /out
 *.gb
 *.gbs
