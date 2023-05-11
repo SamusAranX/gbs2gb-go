@@ -50,18 +50,23 @@ func main() {
 
 	gbsSize := len(gbsBytes)
 	fileLength := gbsSize + int(header.LoadAddr) - gb.GBSHeaderLength
-	fileMBC := 0
+	cartType := 0
 
 	// https://gbdev.gg8.se/wiki/articles/The_Cartridge_Header#0148_-_ROM_Size
-	log.Printf("file length: %d\n", fileLength)
-	romSize, usesMBC := gb.GetROMSize(fileLength)
-	if usesMBC {
-		fileMBC = 1
+	log.Printf("GB file size: %d\n", fileLength)
+	romSize, romSizeBytes, usesMBC := gb.GetROMSize(fileLength)
+	if romSize == -1 {
+		log.Panicf("Final GB file is too large: %d", fileLength)
 	}
 
-	log.Printf("mbc: %d - rom size: %d", fileMBC, romSize)
+	if usesMBC {
+		cartType = 1
+	}
 
-	gbBytes := make([]byte, romSize)
+	log.Printf("CartridgeType: %d", cartType)
+	log.Printf("ROMSize: %d", romSize)
+
+	gbBytes := make([]byte, romSizeBytes)
 	for i := range gbBytes {
 		// empty rom space needs to be filled with 0xFF for checksum purposes
 		gbBytes[i] = 0xFF
@@ -73,7 +78,7 @@ func main() {
 
 	// patch header
 	log.Printf("title bytes copied: %d", copy(gbsPlayer[0x134:0x143], header.TitleBytes[:15]))
-	log.Printf("mbc/size bytes copied: %d", copy(gbsPlayer[0x147:0x149], []byte{byte(fileMBC), byte(romSize)}))
+	log.Printf("mbc/size bytes copied: %d", copy(gbsPlayer[0x147:0x149], []byte{byte(cartType), byte(romSize)}))
 
 	// regenerate header checksum
 	headerChecksum := gb.HeaderChecksum(gbsPlayer[0x134:0x14d])
@@ -88,100 +93,132 @@ func main() {
 	gbsBytesCopied := copy(gbBytes[gbsStart:gbsStart+gbsSize], gbsBytes)
 	log.Printf("gbs file inserted: %d", gbsBytesCopied)
 
-	staticData := gbBytes[:59]
+	// refer to GBS2GB.txt for the following:
 
-	// RST vectors
-	g := gbsStart + gb.GBSHeaderLength
+	staticData := gbBytes[:0x3B]
+
+	// RST Table
+	rstBase := gbsStart + gb.GBSHeaderLength
 	for i := 0; i < 8; i++ {
-		gi := 1 + i*8
-		staticData[gi] = byte(g & 0xff)
-		staticData[gi+1] = byte(g >> 8)
-		if i < 7 {
-			g += 8
-		}
+		rstInst := 0x01 + i*8
+		rstAddr := rstBase + i*8
+
+		rst := make([]byte, 2)
+		binary.LittleEndian.PutUint16(rst, uint16(rstAddr&0xFFFF))
+		rstBytesCopied := copy(staticData[rstInst:rstInst+2], rst)
+
+		log.Printf("rst 0x%02X: 0x%04X [%d]", rstInst, rstAddr, rstBytesCopied)
 	}
 
-	// text data
-	g = gbsStart + 16
+	// Text Data
+	textBase := gbsStart + 0x10 // offset of header.TitleBytes
 	for i := 0; i < 6; i++ {
-		gi := 12 + i*8
-		staticData[gi] = byte(g & 0xff)
-		staticData[gi+1] = byte(g >> 8)
-		if i < 5 {
-			g += 8
-		}
+		textEntry := 0xC + i*8
+		textOffset := textBase + i*16
+
+		text := make([]byte, 2)
+		binary.LittleEndian.PutUint16(text, uint16(textOffset&0xFFFF))
+		textBytesCopied := copy(staticData[textEntry:textEntry+2], text)
+
+		log.Printf("text 0x%02X: 0x%04X [%d]", textEntry, textOffset, textBytesCopied)
 	}
 
-	// other stuff (whatever this is)
-	otherStuff := gbBytes[PlayerEntrypoint : PlayerEntrypoint+123]
-	gOffsets := []int{12, 4, 15, 15, 14, 5, 15}
-	stuffOffsets := []int{7, 40, 49, 64, 75, 95, 121}
-	for i := 0; i < len(gOffsets); i++ {
-		g = gbsStart + gOffsets[i]
-		s := stuffOffsets[i]
-		otherStuff[s] = byte(g & 0xff)
-		otherStuff[s+1] = byte(g >> 8)
+	// Other Stuff
+	otherStuff := gbBytes[PlayerEntrypoint+0x07 : PlayerEntrypoint+0x07+0x7B]
+	stuffOffsets := []int{0x00, 0x21, 0x2A, 0x39, 0x44, 0x58, 0x72}
+	stuffPointers := []int{
+		0x0C, // header.StackPtr
+		0x04, // header.NumberOfSongs
+		0x0F, // header.TimerControl
+		0x0F, // header.TimerControl
+		0x0E, // header.TimerModulo
+		0x05, // header.FirstSong
+		0x0F, // header.TimerControl
+	}
+	for i := 0; i < len(stuffOffsets); i++ {
+		offset := stuffOffsets[i]
+		ptr := gbsStart + stuffPointers[i]
+
+		stuff := make([]byte, 2)
+		binary.LittleEndian.PutUint16(stuff, uint16(ptr&0xFFFF))
+		stuffBytesCopied := copy(otherStuff[offset:offset+2], stuff)
+
+		log.Printf("stuff 0x%02X: 0x%04X [%d]", offset, ptr, stuffBytesCopied)
 	}
 
-	// ei, halt
-	eiHaltBytesCopied := copy(gbBytes[PlayerEntrypoint+146:PlayerEntrypoint+148], []byte{0xFB, 0x76})
+	// EI, Halt
+	eiHaltBytesCopied := copy(gbBytes[PlayerEntrypoint+0x92:PlayerEntrypoint+0x94], []byte{0xFB, 0x76})
 	log.Printf("ei, halt copied: %d", eiHaltBytesCopied)
 
+	var g int
+
+	log.Printf("gbsStart: 0x%04X", gbsStart)
+	log.Printf("pe: 0x%04X:0x%04X", PlayerEntrypoint, PlayerEntrypoint+0x106)
+
 	// shifted data (see gbsplay.asm for the GBS player specifics)
-	shiftedData := gbBytes[PlayerEntrypoint : PlayerEntrypoint+262]
-	gOffsets = []int{10, 4, 4, 8}
-	dataOffsets := []int{153, 184, 199, 260}
-	for i := 0; i < len(gOffsets); i++ {
-		g := gbsStart + gOffsets[i]
-		d := dataOffsets[i]
-		shiftedData[d] = byte(g & 0xff)
-		shiftedData[d+1] = byte(g >> 8)
+	shiftedData := gbBytes[PlayerEntrypoint : PlayerEntrypoint+0x106]
+	shiftOffsets := []int{0x99, 0xB8, 0xC7, 0x104}
+	shiftPointers := []int{
+		0x0A, // header.PlayAddr
+		0x04, // header.NumberOfSongs
+		0x04, // header.NumberOfSongs
+		0x08, // header.InitAddr
+	}
+	for i := 0; i < len(shiftOffsets); i++ {
+		offset := shiftOffsets[i]
+		ptr := gbsStart + shiftPointers[i]
+
+		shift := make([]byte, 2)
+		binary.LittleEndian.PutUint16(shift, uint16(ptr&0xFFFF))
+		shiftBytesCopied := copy(shiftedData[offset:offset+2], shift)
+
+		log.Printf("shift 0x%02X: 0x%04X [%d]", offset, ptr, shiftBytesCopied)
 	}
 
 	// fix off-by-one error
-	offByOneCopied := copy(gbBytes[PlayerEntrypoint+101:PlayerEntrypoint+102], []byte{0x64})
-	log.Printf("off by one copied: %d", offByOneCopied)
+	gbBytes[PlayerEntrypoint+0x65] = 0x64
 
 	// player check subroutine
 	g = gbsStart + gb.GBSHeaderLength
 	pcs1 := make([]byte, 2)
 	pcs2 := make([]byte, 2)
-	binary.LittleEndian.PutUint16(pcs1, uint16(g+64))
-	binary.LittleEndian.PutUint16(pcs2, uint16(g+72))
-	pcs1BytesCopied := copy(gbBytes[65:67], pcs1)
-	pcs2BytesCopied := copy(gbBytes[81:83], pcs2)
+	binary.LittleEndian.PutUint16(pcs1, uint16(g+0x40))
+	binary.LittleEndian.PutUint16(pcs2, uint16(g+0x48))
+	pcs1BytesCopied := copy(gbBytes[0x41:0x43], pcs1)
+	pcs2BytesCopied := copy(gbBytes[0x51:0x53], pcs2)
 	log.Printf("pcs copied: %d, %d", pcs1BytesCopied, pcs2BytesCopied)
 
 	// rewrite reserved interrupt info
 	tacByte := gbBytes[gbsStart+0x0F]
 	if tacByte&0x40 == 0x40 {
-		gbBytes[64] = 0xC3
-		gbBytes[80] = 0xC3
-		gbBytes[PlayerEntrypoint+56] = 0x05
-		gbBytes[PlayerEntrypoint+90] = 0x05
+		gbBytes[0x40] = 0xC3
+		gbBytes[0x50] = 0xC3
+		gbBytes[PlayerEntrypoint+0x38] = 0x05
+		gbBytes[PlayerEntrypoint+0x5A] = 0x05
 	}
 
 	// compensating for 4 extra bytes in the newer gbs player
 	newBin := 4
 
-	// player entrypoint stuff
+	// 150 - 400 recoding
+
 	// (FE11 'CC????' 11???? 210082)
 	pe := make([]byte, 2)
-	binary.LittleEndian.PutUint16(pe, uint16(PlayerEntrypoint+102))
-	log.Printf("pe copied: %d", copy(gbBytes[157+newBin:159+newBin], pe))
+	binary.LittleEndian.PutUint16(pe, uint16(PlayerEntrypoint+0x66))
+	log.Printf("pe copied: %d", copy(gbBytes[0x9D+newBin:0x9F+newBin], pe))
 
 	// (FE11 CC???? '11????' 210082):
-	binary.LittleEndian.PutUint16(pe, uint16(PlayerEntrypoint+267+1))
-	log.Printf("pe copied: %d", copy(gbBytes[160+newBin:162+newBin], pe))
+	binary.LittleEndian.PutUint16(pe, uint16(PlayerEntrypoint+0x10B+1))
+	log.Printf("pe copied: %d", copy(gbBytes[0xA0+newBin:0xA2+newBin], pe))
 
 	// 0x101 jump to the 0x150-0x400 code
 	binary.LittleEndian.PutUint16(pe, uint16(PlayerEntrypoint))
-	log.Printf("pe copied: %d", copy(gbBytes[258:260], pe))
+	log.Printf("pe copied: %d", copy(gbBytes[0x102:0x104], pe))
 
-	binary.LittleEndian.PutUint16(pe, uint16(PlayerEntrypoint+158+1))
-	log.Printf("pe copied: %d", copy(gbBytes[PlayerEntrypoint+149:PlayerEntrypoint+151], pe))
-	binary.LittleEndian.PutUint16(pe, uint16(PlayerEntrypoint+146))
-	log.Printf("pe copied: %d", copy(gbBytes[PlayerEntrypoint+256:PlayerEntrypoint+258], pe))
+	binary.LittleEndian.PutUint16(pe, uint16(PlayerEntrypoint+0x9E+1))
+	log.Printf("pe copied: %d", copy(gbBytes[PlayerEntrypoint+0x95:PlayerEntrypoint+0x97], pe))
+	binary.LittleEndian.PutUint16(pe, uint16(PlayerEntrypoint+0x92))
+	log.Printf("pe copied: %d", copy(gbBytes[PlayerEntrypoint+0x100:PlayerEntrypoint+0x102], pe))
 
 	globalChecksum := make([]byte, 2)
 	binary.BigEndian.PutUint16(globalChecksum, gb.GlobalChecksum(gbBytes))
@@ -199,5 +236,5 @@ func main() {
 		panic(err)
 	}
 
-	log.Printf("gbBytes written to file: %d/%d", written, romSize)
+	log.Printf("gbBytes written to file: %d/%d", written, romSizeBytes)
 }
