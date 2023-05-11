@@ -3,8 +3,7 @@ package gb
 import "strings"
 
 const (
-	gbHeaderStart   = 0x100
-	GBSHeaderLength = 0x70
+	gbsHeaderLength = 0x70
 )
 
 var (
@@ -21,7 +20,7 @@ var (
 	}
 )
 
-func GetROMSize(fileSize int) (romSize int, trueSize int, usesMBC bool) {
+func getROMSize(fileSize int) (romSize int, trueSize int, usesMBC bool) {
 	for i := 0; i < 9; i++ {
 		if fileSize <= (0x8000 << i) {
 			romSize = i
@@ -52,19 +51,19 @@ func GetROMSize(fileSize int) (romSize int, trueSize int, usesMBC bool) {
 //	0x30  0x32  Author string
 //	0x50  0x32  Copyright string
 type GBSHeader struct {
-	Identifier     [3]byte
-	Version        byte
-	NumberOfSongs  byte
-	FirstSong      byte
-	LoadAddr       uint16
-	InitAddr       uint16
-	PlayAddr       uint16
-	StackPtr       uint16
-	TimerModulo    byte
-	TimerControl   byte
-	TitleBytes     [32]byte
-	AuthorBytes    [32]byte
-	CopyrightBytes [32]byte
+	IdentifierBytes [3]byte
+	Version         byte
+	NumberOfSongs   byte
+	FirstSong       byte
+	LoadAddr        uint16
+	InitAddr        uint16
+	PlayAddr        uint16
+	StackPtr        uint16
+	TimerModulo     byte
+	TimerControl    byte
+	TitleBytes      [32]byte
+	AuthorBytes     [32]byte
+	CopyrightBytes  [32]byte
 }
 
 func trimHeaderString(b []byte) string {
@@ -72,6 +71,10 @@ func trimHeaderString(b []byte) string {
 	s = strings.Trim(s, "\u0000")
 	s = strings.TrimSpace(s)
 	return s
+}
+
+func (gbs GBSHeader) Identifier() string {
+	return trimHeaderString(gbs.IdentifierBytes[:])
 }
 
 func (gbs GBSHeader) Title() string {
@@ -86,10 +89,10 @@ func (gbs GBSHeader) Copyright() string {
 	return trimHeaderString(gbs.CopyrightBytes[:])
 }
 
-// HeaderChecksum generates the cartridge header checksum according to
+// headerChecksum generates the cartridge header checksum according to
 // https://gbdev.gg8.se/wiki/articles/The_Cartridge_Header#014D_-_Header_Checksum.
 // Example Code: x=0:FOR i=0134h TO 014Ch:x=x-MEM[i]-1:NEXT
-func HeaderChecksum(gbHeader []byte) byte {
+func headerChecksum(gbHeader []byte) byte {
 	var cs int
 	for _, b := range gbHeader {
 		cs = (cs - int(b) - 1) & 0xff
@@ -97,10 +100,10 @@ func HeaderChecksum(gbHeader []byte) byte {
 	return byte(cs)
 }
 
-// GlobalChecksum generates the cartridge header checksum according to
+// globalChecksum generates the cartridge header checksum according to
 // https://gbdev.gg8.se/wiki/articles/The_Cartridge_Header#014E-014F_-_Global_Checksum.
 // Produced by adding all bytes of the cartridge (except for the two checksum bytes).
-func GlobalChecksum(gb []byte) uint16 {
+func globalChecksum(gb []byte) uint16 {
 	var cs int
 
 	for i, b := range gb {
