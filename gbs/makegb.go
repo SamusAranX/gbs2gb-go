@@ -234,12 +234,10 @@ func MakeGB(gbsBytes []byte, outFile string) error {
 	binary.BigEndian.PutUint16(gcs, globalChecksum(gbBytes))
 	copy(gbBytes[0x14E:0x150], gcs)
 
-	written, err := utils.WriteAllBytes(outFile, gbBytes)
+	_, err = utils.WriteAllBytes(outFile, gbBytes)
 	if err != nil {
 		return err
 	}
-
-	log.Printf("gbBytes written to file: %d/%d", written, romSizeBytes)
 
 	return nil
 }
