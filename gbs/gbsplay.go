@@ -1,4 +1,4 @@
-package gb
+package gbs
 
 var (
 	gbsPlay = [...]byte{

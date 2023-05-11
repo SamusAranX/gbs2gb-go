@@ -1,41 +1,16 @@
-package gb
+package gbs
 
-import "strings"
+import (
+	"bytes"
+	"encoding/binary"
+	"strings"
+)
 
 const (
-	gbsHeaderLength = 0x70
+	headerLength = 0x70
 )
 
-var (
-	romSizes = map[int]int{
-		0: 1 << 15, // 32 KiB (no ROM banking)
-		1: 1 << 16, // 64 KiB (4 banks)
-		2: 1 << 17, // 128 KiB (8 banks)
-		3: 1 << 18, // 256 KiB (16 banks)
-		4: 1 << 19, // 512 KiB (32 banks)
-		5: 1 << 20, // 1 MiB (64 banks)
-		6: 1 << 21, // 2 MiB (128 banks)
-		7: 1 << 22, // 4 MiB (256 banks)
-		8: 1 << 23, // 8 MiB (512 banks)
-	}
-)
-
-func getROMSize(fileSize int) (romSize int, trueSize int, usesMBC bool) {
-	for i := 0; i < 9; i++ {
-		if fileSize <= (0x8000 << i) {
-			romSize = i
-			trueSize = romSizes[i]
-			return romSize, trueSize, usesMBC
-		}
-
-		// only set to true if a second loop happens
-		usesMBC = true
-	}
-
-	return -1, -1, false
-}
-
-// GBSHeader describes the header of a GBS file.
+// Header describes the header of a GBS file.
 //
 //	0x00  0x03  Identifier string ("GBS")
 //	0x03  0x01  Version (1)
@@ -50,7 +25,7 @@ func getROMSize(fileSize int) (romSize int, trueSize int, usesMBC bool) {
 //	0x10  0x32  Title string
 //	0x30  0x32  Author string
 //	0x50  0x32  Copyright string
-type GBSHeader struct {
+type Header struct {
 	IdentifierBytes [3]byte
 	Version         byte
 	NumberOfSongs   byte
@@ -66,6 +41,17 @@ type GBSHeader struct {
 	CopyrightBytes  [32]byte
 }
 
+func NewHeader(data []byte) (Header, error) {
+	header := Header{}
+	headerBuf := bytes.NewBuffer(data)
+	err := binary.Read(headerBuf, binary.LittleEndian, &header)
+	if err != nil {
+		return header, err
+	}
+
+	return header, nil
+}
+
 func trimHeaderString(b []byte) string {
 	s := string(b)
 	s = strings.Trim(s, "\u0000")
@@ -73,19 +59,19 @@ func trimHeaderString(b []byte) string {
 	return s
 }
 
-func (gbs GBSHeader) Identifier() string {
+func (gbs Header) Identifier() string {
 	return trimHeaderString(gbs.IdentifierBytes[:])
 }
 
-func (gbs GBSHeader) Title() string {
+func (gbs Header) Title() string {
 	return trimHeaderString(gbs.TitleBytes[:])
 }
 
-func (gbs GBSHeader) Author() string {
+func (gbs Header) Author() string {
 	return trimHeaderString(gbs.AuthorBytes[:])
 }
 
-func (gbs GBSHeader) Copyright() string {
+func (gbs Header) Copyright() string {
 	return trimHeaderString(gbs.CopyrightBytes[:])
 }
 
