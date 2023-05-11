@@ -1,0 +1,94 @@
+GBS Init Address must begin at or after 0470, or it's not compatible
+
+GBSStart = Start of GBS file within Gameboy ROM
+HeaderLength = 0x70 bytes
+
+See the init address of the GBS file, and subtract 0x70 for the GBS start. This aligns the data correctly within the ROM. Use GBS Start for the load address in ROM, padding null data(00) after the GBS player (0000-0400 in ROM) up to the GBSStart point.
+
+File padding is as follows:
+
+'Address sizes assume that the Programming language used starts at 0 for the first byte.
+'The information is stacked so that larger checks come before smaller ones,
+'so that they end up true on the largest check possible
+'16384 = 1 bank
+FileMBC = 1 'Banking needed
+If FileLength > (16384 * 128) Then
+FileLength = (16384 * 256)
+ElseIf FileLength > (16384 * 64) Then
+FileLength = (16384 * 128)
+ElseIf FileLength > (16384 * 32) Then
+FileLength = (16384 * 64)
+ElseIf FileLength > (16384 * 16) Then
+FileLength = (16384 * 32)
+ElseIf FileLength > (16384 * 8) Then
+FileLength = (16384 * 16)
+ElseIf FileLength > (16384 * 4) Then
+FileLength = (16384 * 8)
+ElseIf FileLength > (16384 * 2) Then
+FileLength = (16384 * 4)
+ElseIf FileLength > (0) Then
+FileLength = (16384 * 2) ' This makes it 0x8000 in size. It's enough to make BGB read in the second bank. Doesn't need to be bigger.
+FileMBC = 0 ' FileMBC is only needed if there's more than 2 banks
+End If
+
+Pad the file with FF bytes when converting to a GB file, if needed. This is what the gameboy does by default. Also helps for debugging. Just BP 0038 in code, then change byte 0038 to C9 to jump out to where the error occured at, in many cases.
+
+RST Table:
+0001 = GBSStart + HeaderLength(0x70) + 0
+0009 = GBSStart + HeaderLength(0x70) + 8
+0011 = GBSStart + HeaderLength(0x70) + 10
+0019 = GBSStart + HeaderLength(0x70) + 18
+0021 = GBSStart + HeaderLength(0x70) + 20
+0029 = GBSStart + HeaderLength(0x70) + 28
+0031 = GBSStart + HeaderLength(0x70) + 30
+0039 = GBSStart + HeaderLength(0x70) + 38
+
+Text Data:
+000C = GBSStart + 10
+0014 = GBSStart + 18
+001C = GBSStart + 20 
+0024 = GBSStart + 28
+002C = GBSStart + 30
+0034 = GBSStart + 38
+
+Other Stuff:
+014E-014F = Checksum(just gives a warning if it's not correct)
+0157 = GBSStart + 0C (Stack Pointer)
+0178 = GBSStart + 04 (Number of Songs)
+0181 = GBSStart + 0F (Reads Timer Control)
+0190 = GBSStart + 0F (Reads Timer Control)
+019B = GBSStart + 0E (Reads Modulo Address)
+01AF = GBSStart + 05 (Initial Song)
+01C9 = GBSStart + 0F (Reads Timer Control)
+
+Normal:
+01E8 = GBSStart + 0A (Equals Play Address)
+0207 = GBSStart + 04 (Number of Songs)
+0216 = GBSStart + 04 (Number of Songs)
+0253 = GBSStart + 08 (Init Address)
+
+Modified:
+01E9 = GBSStart + 0A (Equals Play Address)
+0208 = GBSStart + 04 (Number of Songs)
+0217 = GBSStart + 04 (Number of Songs)
+0254 = GBSStart + 08 (Init Address)
+
+
+150 - 400 Recoding:
+9D = (150 Marker) + 66
+A0 = (150 Marker) + 10B ('font' in ASM)
+102 = (150 Marker)
+
+(150 Marker) + 149 = (150 Marker) + 158
+24F (150 Marker) + 255 = (150 Marker) + 145
+
+
+GBS2GSF:
+minigsf "Deja Vu 1 and 2" "8000ACA9" "1" "19"
+minigsf "wario3" "8000E739" "1" "58"
+
+Offset for minigsf: 0x80000000 + File Offset for song init
+
+copy /b goomba.gba+rom.gb rom.gba
+rom2gsf <gba-rom-files> [-m]
+minigsf <Base name> <Offset> <Size> <Count>
