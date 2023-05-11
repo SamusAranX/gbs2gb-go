@@ -25,9 +25,9 @@ func MakeGB(gbsBytes []byte, outFile string) error {
 		return errors.New("file does not have a valid GBS header")
 	}
 
-	log.Printf("Title:        %s\n", header.Title())
-	log.Printf("Author:       %s\n", header.Author())
-	log.Printf("Copyright:    %s\n", header.Copyright())
+	log.Printf("Title:        %s", header.Title())
+	log.Printf("Author:       %s", header.Author())
+	log.Printf("Copyright:    %s", header.Copyright())
 	log.Printf("Load Address: 0x%[1]X (%[1]d)", header.LoadAddr)
 
 	if header.LoadAddr < 0x470 {
@@ -39,7 +39,7 @@ func MakeGB(gbsBytes []byte, outFile string) error {
 	cartType := 0
 
 	// https://gbdev.gg8.se/wiki/articles/The_Cartridge_Header#0148_-_ROM_Size
-	log.Printf("GB file size: %d\n", fileLength)
+	log.Printf("GB file size: %d", fileLength)
 	romSize, romSizeBytes, usesMBC := getROMSize(fileLength)
 	if romSize == -1 {
 		return errors.New(fmt.Sprintf("final gb file is too large: %d", fileLength))
@@ -58,7 +58,7 @@ func MakeGB(gbsBytes []byte, outFile string) error {
 		gbBytes[i] = 0xFF
 	}
 
-	log.Printf("rom length: %d\n", len(gbBytes))
+	log.Printf("rom length: %d", len(gbBytes))
 
 	gbsPlayer := GBSPlayROM()
 
