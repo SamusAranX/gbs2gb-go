@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"gbs2gb/constants"
-	"gbs2gb/gb"
+	"gbs2gb/gbs"
 	"gbs2gb/utils"
 	"github.com/jessevdk/go-flags"
 	"log"
@@ -48,7 +48,7 @@ func main() {
 			continue
 		}
 
-		err = gb.MakeGB(gbsBytes, outputFile)
+		err = gbs.MakeGB(gbsBytes, outputFile, opts.Debug)
 		if err != nil {
 			log.Printf("ERROR: Couldn't create GB file.")
 			log.Println(err)
