@@ -1,8 +1,7 @@
 module gbs2gb
 
-go 1.20
+go 1.21
 
-require (
-	github.com/jessevdk/go-flags v1.5.0 // indirect
-	golang.org/x/sys v0.0.0-20210320140829-1e4c9ba3b0c4 // indirect
-)
+require github.com/jessevdk/go-flags v1.5.0
+
+require golang.org/x/sys v0.12.0 // indirect
